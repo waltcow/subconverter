@@ -115,8 +115,12 @@ static std::string transformRuleToCommon(string_view_array &temp, const std::str
         strLine += group;
         if(temp.size() > 2 && (!no_resolve_only || temp[2] == "no-resolve"))
         {
-            strLine += ",";
-            strLine += temp[2];
+            // Skip adding no-resolve tag when add_via_interface is true
+            if(!(add_via_interface && temp[2] == "no-resolve"))
+            {
+                strLine += ",";
+                strLine += temp[2];
+            }
         }
     }
     
