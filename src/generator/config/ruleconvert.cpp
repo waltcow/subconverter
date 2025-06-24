@@ -95,7 +95,7 @@ std::string convertRuleset(const std::string &content, int type)
     }
 }
 
-static std::string transformRuleToCommon(string_view_array &temp, const std::string &input, const std::string &group, bool no_resolve_only = false)
+static std::string transformRuleToCommon(string_view_array &temp, const std::string &input, const std::string &group, bool no_resolve_only = false, bool add_via_interface = false)
 {
     temp.clear();
     std::string strLine;
@@ -119,6 +119,13 @@ static std::string transformRuleToCommon(string_view_array &temp, const std::str
             strLine += temp[2];
         }
     }
+    
+    // Add via-interface=%TUN% for QuantumultX if needed
+    if(add_via_interface)
+    {
+        strLine += ", via-interface=%TUN%";
+    }
+    
     return strLine;
 }
 
@@ -304,6 +311,17 @@ void rulesetToSurge(INIReader &base_rule, std::vector<RulesetContent> &ruleset_c
         rule_group = x.rule_group;
         rule_path = x.rule_path;
         rule_path_typed = x.rule_path_typed;
+        
+        // Check if the rule path contains #via=%TUN% for QuantumultX via-interface hack
+        bool use_via_interface = false;
+        if(surge_ver == -1 && rule_path.find("#via=%TUN%") != std::string::npos)
+        {
+            use_via_interface = true;
+            // Remove the #via=%TUN% from the actual URL processing
+            rule_path = rule_path.substr(0, rule_path.find("#via=%TUN%"));
+            rule_path_typed = rule_path_typed.substr(0, rule_path_typed.find("#via=%TUN%"));
+        }
+        
         if(rule_path.empty())
         {
             strLine = x.rule_content.get().substr(2);
@@ -311,12 +329,12 @@ void rulesetToSurge(INIReader &base_rule, std::vector<RulesetContent> &ruleset_c
                 strLine = "FINAL";
             if(surge_ver == -1 || surge_ver == -2)
             {
-                strLine = transformRuleToCommon(temp, strLine, rule_group, true);
+                strLine = transformRuleToCommon(temp, strLine, rule_group, true, (surge_ver == -1) ? use_via_interface : false);
             }
             else
             {
                 if(!startsWith(strLine, "AND") && !startsWith(strLine, "OR") && !startsWith(strLine, "NOT"))
-                    strLine = transformRuleToCommon(temp, strLine, rule_group);
+                    strLine = transformRuleToCommon(temp, strLine, rule_group, false, false);
             }
             strLine = replaceAllDistinct(strLine, ",,", ",");
             allRules.emplace_back(strLine);
@@ -451,12 +469,12 @@ void rulesetToSurge(INIReader &base_rule, std::vector<RulesetContent> &ruleset_c
                 {
                     if(startsWith(strLine, "IP-CIDR6"))
                         strLine.replace(0, 8, "IP6-CIDR");
-                    strLine = transformRuleToCommon(temp, strLine, rule_group, true);
+                    strLine = transformRuleToCommon(temp, strLine, rule_group, true, (surge_ver == -1) ? use_via_interface : false);
                 }
                 else
                 {
                     if(!startsWith(strLine, "AND") && !startsWith(strLine, "OR") && !startsWith(strLine, "NOT"))
-                        strLine = transformRuleToCommon(temp, strLine, rule_group);
+                        strLine = transformRuleToCommon(temp, strLine, rule_group, false, false);
                 }
                 allRules.emplace_back(strLine);
                 total_rules++;
